@@ -117,15 +117,15 @@ def infer_on_stream(args, client):
     # Flag for the input image
     single_image_mode = False
     # Check if the input is a webcam
-    if args.i == 'CAM':
-        args.i = 0
-    elif args.i.endswith('.jpg') or args.i.endswith('.bmp'):
+    if args.input == 'CAM':
+        args.input = 0
+    elif args.input.endswith('.jpg') or args.input.endswith('.bmp'):
         single_image_mode = True
 
     # Handle the input stream 
     # Get and open video capture
-    capture = cv2.Videocaptureture(args.i)
-    capture.open(args.i)
+    capture = cv2.VideoCapture(args.input)
+    capture.open(args.input)
 
     # Grab the shape of the input 
     width = int(capture.get(3))

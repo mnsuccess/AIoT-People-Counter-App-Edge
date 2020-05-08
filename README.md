@@ -208,8 +208,8 @@ MQTT_SERVER: "ws://localhost:3002"
 
 
 You can see the WRITEUP here 
-![WRITEUP](https://github.com/mnsuccess/AIoT-People-Counter-App-Edge/blob/master/WRITEUP.md)
+[WRITEUP](https://github.com/mnsuccess/AIoT-People-Counter-App-Edge/blob/master/WRITEUP.md)
 
 
 You can see the demo here 
-![demo](https://youtu.be/GEbNlaXVVrA)
+[demo](https://www.youtube.com/watch?v=GEbNlaXVVrA)

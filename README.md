@@ -8,11 +8,11 @@
 
 ## What it Does
 
-The people counter application will demonstrate how to create a smart video IoT solution using Intel® hardware and software tools. The app will detect people in a designated area, providing the number of people in the frame, average duration of people in frame, and total count.
+The people counter application  demonstrates how to create a smart video IoT solution using Intel® hardware and software tools. The app will detect people in a designated area, providing the number of people in the frame, average duration of people in frame, and total count.
 
 ## How it Works
 
-The counter will use the Inference Engine included in the Intel® Distribution of OpenVINO™ Toolkit. The model used should be able to identify people in a video frame. The app should count the number of people in the current frame, the duration that a person is in the frame (time elapsed between entering and exiting a frame) and the total count of people. It then sends the data to a local web server using the Paho MQTT Python package.
+The counter uses the Inference Engine included in the Intel® Distribution of OpenVINO™ Toolkit. The model used should be able to identify people in a video frame. The app should count the number of people in the current frame, the duration that a person is in the frame (time elapsed between entering and exiting a frame) and the total count of people. It then sends the data to a local web server using the Paho MQTT Python package.
 
 You will choose a model to use and convert it with the Model Optimizer.
 
@@ -24,7 +24,7 @@ You will choose a model to use and convert it with the Model Optimizer.
 
 * 6th to 10th generation Intel® Core™ processor with Iris® Pro graphics or Intel® HD Graphics.
 * OR use of Intel® Neural Compute Stick 2 (NCS2)
-* OR Udacity classroom workspace for the related course
+* OR cloud workspace for the related 
 
 ### Software
 
@@ -85,7 +85,7 @@ From the main directory:
 
 ## What model to use
 
-It is up to you to decide on what model to use for the application. You need to find a model not already converted to Intermediate Representation format (i.e. not one of the Intel® Pre-Trained Models), convert it, and utilize the converted model in your application.
+It is up to you to decide on what model to use for the application. You need to find a model not  or already converted to Intermediate Representation format (i.e. not one of the Intel® Pre-Trained Models), convert it, and utilize the converted model in your application.
 
 Note that you may need to do additional processing of the output to handle incorrect detections, such as adjusting confidence threshold or accounting for 1-2 frames where the model fails to see a person already counted and would otherwise double count.
 
@@ -177,6 +177,11 @@ For example:
 ```
 python main.py -i CAM -m your-model.xml -l /opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libcpu_extension_sse4.so -d CPU -pt 0.6 | ffmpeg -v warning -f rawvideo -pixel_format bgr24 -video_size 768x432 -framerate 24 -i - http://0.0.0.0:3004/fac.ffm
 ```
+for this project :
+
+```
+python main.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m model/pre_trained/intel/person-detection-retail-0013/FP16/person-detection-retail-0013.xml -l /opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libcpu_extension_sse4.so -d CPU -pt 0.6 | ffmpeg -v warning -f rawvideo -pixel_format bgr24 -video_size 768x432 -framerate 24 -i - http://0.0.0.0:3004/fac.ffm
+```
 
 To see the output on a web based interface, open the link [http://0.0.0.0:3004](http://0.0.0.0:3004/) in a browser.
 
@@ -200,3 +205,11 @@ CAMERA_FEED_SERVER: "http://localhost:3004"
 ...
 MQTT_SERVER: "ws://localhost:3002"
 ```
+
+
+You can see the WRITEUP here 
+![WRITEUP](https://github.com/mnsuccess/AIoT-People-Counter-App-Edge/blob/master/WRITEUP.md)
+
+
+You can see the demo here 
+![demo](https://youtu.be/GEbNlaXVVrA)

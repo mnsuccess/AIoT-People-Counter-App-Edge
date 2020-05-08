@@ -33,13 +33,13 @@ import paho.mqtt.client as mqtt
 from argparse import ArgumentParser
 from inference import Network
 
+
 # MQTT server environment variables
 HOSTNAME = socket.gethostname()
 IPADDRESS = socket.gethostbyname(HOSTNAME)
 MQTT_HOST = IPADDRESS
 MQTT_PORT = 3001
 MQTT_KEEPALIVE_INTERVAL = 60
-
 
 def build_argparser():
     """
@@ -74,27 +74,35 @@ def connect_mqtt():
     client.connect(MQTT_HOST, MQTT_PORT, MQTT_KEEPALIVE_INTERVAL)
 
     return client
-
-def draw_boxes(frame,result,prob_threshold, width, height):
+ 
+def draw_boxes(frame,output_result,prob_threshold, width, height):
     """
     Draw bounding boxes onto the frame.
     :param frame: frame from camera/video
     :param result: list contains the data comming from inference
     :return: person count and frame
     """
-    current_count = 0
-    for obj in result[0][0]: # Output shape is 1x1x100x7
-        # Draw bounding box for object when it's probability is more than
-        #  the specified threshold
-        if obj[2] > prob_threshold:
-            xmin = int(obj[3] * width)
-            ymin = int(obj[4] * height)
-            xmax = int(obj[5] * width)
-            ymax = int(obj[6] * height)
-            cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), (0, 55, 255), 1)
-            current_count = current_count + 1
-    return frame, current_count
-
+    counter=0
+    # Start coordinate, here (xmin, ymin) 
+    # represents the top left corner of rectangle 
+    start_point = None
+    # Ending coordinate, here (xmax, ymax) 
+    # represents the bottom right corner of rectangle 
+    end_point = None 
+    # Blue color in BGR 
+    color = (0, 255, 0)
+    # Line thickness of 2 px 
+    thickness = 1
+    for box in output_result[0][0]: # Output shape is 1x1x100x7
+        if box[2] > prob_threshold:
+            start_point = (int(box[3] * width), int(box[4] * height))
+            end_point = (int(box[5] * width), int(box[6] * height))
+            # Using cv2.rectangle() method 
+            # Draw a rectangle with Green line borders of thickness of 1 px
+            frame = cv2.rectangle(frame, start_point, end_point, color,thickness)
+            counter+=1
+    return frame, counter
+    
 def infer_on_stream(args, client):
     """
     Initialize the inference network, stream video to network,
@@ -104,37 +112,51 @@ def infer_on_stream(args, client):
     :param client: MQTT client
     :return: None
     """
+    
+    # Input arguments
+    modelArgs = args.model
+    deviceArgs = args.device
+    cpuExtensionArgs = args.cpu_extension
+    propThresholdArgs = args.prob_threshold
+    filePathArgs = args.input
+    
     # Initialise the class
     infer_network = Network()
+    
     #Load the model through `infer_network`
-    infer_network.load_model(args.model,args.device,args.cpu_extension)
+    infer_network.load_model(modelArgs,deviceArgs,cpuExtensionArgs)
     net_input_shape = infer_network.get_input_shape()
+    
     # Set Probability threshold for detections
-    prob_threshold = args.prob_threshold
+    prob_threshold = propThresholdArgs
     
     # Handle image, video or webcam
     # Create a flag for single images
     # Flag for the input image
     single_image_mode = False
     # Check if the input is a webcam
-    if args.input == 'CAM':
-        args.input = 0
-    elif args.input.endswith('.jpg') or args.input.endswith('.bmp'):
+    if filePathArgs == 'CAM':
+        filePathArgs = 0
+    elif filePathArgs.endswith('.jpg') or filePathArgs.endswith('.bmp'):
         single_image_mode = True
 
     # Handle the input stream 
     # Get and open video capture
-    capture = cv2.VideoCapture(args.input)
-    capture.open(args.input)
+    capture = cv2.VideoCapture(filePathArgs)
+    capture.open(filePathArgs)
 
     # Grab the shape of the input 
     width = int(capture.get(3))
     height = int(capture.get(4))
     
     # initlise some variable 
-    last_count = 0
-    total_count = 0
-    start_time = 0
+    report = 0
+    counter = 0
+    counter_prev = 0
+    duration_prev = 0
+    counter_total = 0
+    dur = 0
+    request_id=0
     
     # Process frames until the video ends, or process is exited
     while capture.isOpened():
@@ -145,52 +167,69 @@ def infer_on_stream(args, client):
         key_pressed = cv2.waitKey(60)
 
         # Pre-process the frame
-        #Re-size the frame to inputshape_widthxinputshape_height
+        #Re-size the frame to inputshape_width x inputshape_height
         p_frame = cv2.resize(frame, (net_input_shape[3], net_input_shape[2]))
         p_frame = p_frame.transpose((2,0,1))
         p_frame = p_frame.reshape(1, *p_frame.shape)
+        
         #Start asynchronous inference for specified request
         #Perform inference on the frame
+        duration_report = None
         inf_start = time.time()
         infer_network.exec_net(p_frame)
         # Get the output of inference
         if infer_network.wait() == 0:
             det_time = time.time() - inf_start
             # Results of the output layer of the network
-            result = infer_network.get_output()
+            output_results = infer_network.get_output()
             #Extract any desired stats from the results 
             #Update the frame to include detected bounding boxes
-            frame,current_count = draw_boxes(frame, result, prob_threshold , width, height)
+            frame_with_box, pointer = draw_boxes(frame, output_results, prob_threshold, width, height)
+            #Display inference time
+            inf_time_message = "Manasse_Ngudia | Inference time: {:.3f}ms"\
+                               .format(det_time * 1000)
+            cv2.putText(frame_with_box, inf_time_message, (15, 15),
+                       cv2.FONT_HERSHEY_COMPLEX, 0.45, (200, 10, 10), 1)
+                    
             #Calculate and send relevant information on 
             ### current_count, total_count and duration to the MQTT server ###
             ### Topic "person": keys of "count" and "total" ###
             ### Topic "person/duration": key of "duration" ###
-            inf_time_message = "Inference time: {:.3f}ms"\
-                               .format(det_time * 1000)
-            cv2.putText(frame, inf_time_message, (15, 15),
-                        cv2.FONT_HERSHEY_COMPLEX, 0.5, (200, 10, 10), 1)
-            
-            # When new person enters the video
-            if current_count > last_count:
-                start_time = time.time()
-                total_count = total_count + current_count - last_count
-                client.publish("person", json.dumps({"total": total_count}))
-
-            # Person duration in the video is calculated
-            if current_count < last_count:
-                duration = int(time.time() - start_time)
-                # Publish messages to the MQTT server
-                client.publish("person/duration",json.dumps({"duration": duration}))
-
-            client.publish("person", json.dumps({"count": current_count}))
-            last_count = current_count
+            if pointer != counter:
+                counter_prev = counter
+                counter = pointer
+                if dur >= 3:
+                    duration_prev = dur
+                    dur = 0
+                else:
+                    dur = duration_prev + dur
+                    duration_prev = 0  # unknown, not needed in this case
+            else:
+                dur += 1
+                if dur >= 3:
+                    report = counter
+                    if dur == 3 and counter > counter_prev:
+                        counter_total += counter - counter_prev
+                    elif dur == 3 and counter < counter_prev:
+                        duration_report = int((duration_prev / 10.0) * 1000)
+                        
+            client.publish('person',
+                           payload=json.dumps({
+                               'count': report, 'total': counter_total}),
+                           qos=0, retain=False)
+            if duration_report is not None:
+                client.publish('person/duration',
+                               payload=json.dumps({'duration': duration_report}),
+                               qos=0, retain=False)
             
             #Send frame to the ffmpeg server
-            sys.stdout.buffer.write(frame)
+            #  Resize the frame
+            #frame = cv2.resize(frame, (768, 432))
+            sys.stdout.buffer.write(frame_with_box)
             sys.stdout.flush()
             
             if single_image_mode:
-                cv2.imwrite('output_image.jpg', frame)
+                cv2.imwrite('output_image.jpg', frame_with_box)
 
         # Break if escapturee key pressed
         if key_pressed == 27:

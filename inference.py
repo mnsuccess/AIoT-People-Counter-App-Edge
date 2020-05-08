@@ -51,36 +51,33 @@ class Network:
         # Initialize the plugin
         self.plugin = IECore()
         # Read the IR as a IENetwork
-        log.info("Reading IR...")
         self.network = IENetwork(model=model_xml, weights=model_bin)
-        log.info("Loading IR to the plugin...")
-        # Add any necessary extensions ###
-        self.plugin.add_extension(cpu_extension, device)
         # Check for supported layers ###
         # Check for any unsupported layers, and let the user 
         # know if anything is missing. Exit the program, if so
         supported_layers = self.plugin.query_network(self.network,device)
         unsupported_layers = [l for l in self.network.layers.keys() if l not in supported_layers]
         if len(unsupported_layers) != 0:
-            log.error("Unsupported layers found: {}".format(unsupported_layers))
-            log.error("Check whether  cpu  extensions are available to add to IECore.")
-            sys.exit(1)
+            #log.error("Unsupported layers found: {}".format(unsupported_layers))
+            #log.error("Check whether  cpu  extensions are available to add to IECore.")
+            #sys.exit(1)
+            # Add any necessary extensions ###
+            self.plugin.add_extension(cpu_extension, device)
         # Return the loaded inference plugin ###
-        ### Note: You may need to update the function parameters. ###
         # Load the IENetwork into the plugin
         self.exec_network = self.plugin.load_network(self.network , device)
-        log.info("IR successfully loaded into Inference Engine.")
+        # Get the input layer
+        self.input_blob = next(iter(self.network.inputs))
+        self.output_blob = next(iter(self.network.outputs))
         return self.exec_network;
 
     def get_input_shape(self):
         # Return the shape of the input layer ###
-        # Get the input blob for the inference request
-        self.input_blob = next(iter(self.network.inputs))# Get the input layer
         return self.network.inputs[self.input_blob].shape
 
-    def exec_net(self,image):
+    def exec_net(self,frame):
         #tart an asynchronous request ###
-        self.exec_network.start_async(request_id=0,inputs={self.input_blob: image})
+        self.exec_network.start_async(request_id=0,inputs={self.input_blob: frame})
         return self.exec_network
 
     def wait(self):
@@ -90,5 +87,4 @@ class Network:
 
     def get_output(self):
         #Extract and return the output results
-        self.output_blob = next(iter(self.network.outputs))
         return self.exec_network.requests[0].outputs[self.output_blob]
